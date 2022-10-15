@@ -1,0 +1,16 @@
+# The directory to store media downloaded from Telegram and the state file
+data_dir="/path/to/folder"
+
+# Maximum number of messages to retrieve from Telegram
+max_messages=10
+
+[telegram]
+api_id="API_ID"
+api_hash="API_HASH"
+chat_name="Tg Public Chat"
+
+[twitter]
+api_key="API_KEY"
+api_secret="API_SECRET"
+access_token="ACCESS_TOKEN"
+access_token_secret="ACCESS_TOKEN_SECRET"
