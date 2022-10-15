@@ -5,8 +5,8 @@ edition = "2021"
 
 [dependencies]
 egg-mode = { version = "0.16", features = ["rustls"], default-features = false }
-grammers-client = { git = "https://github.com/Lonami/grammers", rev = "96f61a16b4c4ba5e33175fbaafae061dcbd4af25" }
-grammers-session = { git = "https://github.com/Lonami/grammers", rev = "96f61a16b4c4ba5e33175fbaafae061dcbd4af25" }
+grammers-client = "0.4"
+grammers-session = "0.4"
 log = "0.4.14"
 mime_guess = "2.0.3"
 serde_json = "1.0.85"
