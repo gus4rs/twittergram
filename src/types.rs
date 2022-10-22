@@ -1,7 +1,8 @@
+use crate::telegram::types::TelegramMessage;
 use crate::{mime, APPLICATION_OCTET_STREAM, TEXT_VCARD};
 use egg_mode::media::MediaId;
+use grammers_client::types::Media;
 use grammers_client::types::Media::{Contact, Document, Photo, Sticker};
-use grammers_client::types::{Media, Message};
 use mime_guess::Mime;
 use serde::Deserialize;
 use tokio::sync::mpsc;
@@ -49,7 +50,7 @@ impl Post {
         }
     }
 
-    pub(crate) fn from_message(msg: &Message) -> Post {
+    pub(crate) fn from_message<M: TelegramMessage>(msg: &M) -> Post {
         let mut post = Post::new(msg.id(), msg.text().to_string());
         if let Some(media) = msg.media() {
             post.add_tg_attachment(Attachment::new(media));

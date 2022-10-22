@@ -1,21 +1,20 @@
-mod persistence;
-mod telegram;
-mod twitter;
-mod types;
-mod util;
-
-use crate::mime::{APPLICATION_OCTET_STREAM, TEXT_VCARD};
-use crate::persistence::Persister;
-use crate::telegram::downloader::TelegramDownloader;
-use crate::telegram::fetcher::TelegramGenerator;
-use crate::twitter::create_token;
-use crate::twitter::poster::TwitterPoster;
-use crate::twitter::uploader::TwitterUploader;
-use crate::types::Cfg;
-use crate::types::{Processor, Runnable, Source};
 use mime_guess::mime;
 use simple_logger::SimpleLogger;
 use tokio::fs;
+
+use crate::mime::{APPLICATION_OCTET_STREAM, TEXT_VCARD};
+use crate::persistence::Persister;
+use crate::telegram::telegram_client::GrammersClient;
+use crate::twitter::egg_mode_client::EggTwitterClient;
+use crate::twittergram::Twittergram;
+use crate::types::Cfg;
+
+mod persistence;
+mod telegram;
+mod twitter;
+mod twittergram;
+mod types;
+mod util;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
@@ -34,31 +33,12 @@ async fn main() -> Result<()> {
 
     let config: Cfg = toml::from_str(&config_file).unwrap();
 
-    let mut persister = Persister::new(&config.data_dir).await;
-    log::info!("Last processed id: {}", persister.get_last_id());
+    Persister::check_data_dir(&config.data_dir).await;
 
-    let client = telegram::create_client(&config).await?;
-    let token = create_token(&config.twitter);
+    let telegram_client = GrammersClient::new(&config).await;
+    let twitter_client = EggTwitterClient::new(&config);
 
-    let mut generator = TelegramGenerator::new(client.clone(), &config, persister.get_last_id());
-    let mut downloader = TelegramDownloader::new(client.clone(), &config);
-    let mut twitter_uploader = TwitterUploader::new(token.clone(), &config);
-    let mut twitter_poster = TwitterPoster::new(token.clone());
-
-    generator
-        .drain_to(&mut downloader)
-        .connect_to(&mut twitter_uploader)
-        .connect_to(&mut twitter_poster)
-        .sink_at(&mut persister);
-
-    let _ = tokio::join!(
-        generator.run(),
-        downloader.run(),
-        twitter_uploader.run(),
-        twitter_poster.run(),
-        persister.run()
-    );
-
-    log::info!("End processing");
-    Ok(())
+    Twittergram::new(config, telegram_client, twitter_client)
+        .run()
+        .await
 }

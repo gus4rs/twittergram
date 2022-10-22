@@ -1,5 +1,7 @@
 pub(crate) mod downloader;
 pub(crate) mod fetcher;
+pub(crate) mod telegram_client;
+pub(crate) mod types;
 
 use std::collections::{BTreeMap, HashMap};
 use std::io::stdin;
@@ -13,16 +15,12 @@ use grammers_session::Session;
 
 static SESSION_NAME: &str = "telegram.session";
 
-pub fn get_session_path(config: &Cfg) -> PathBuf {
-    let mut buf = PathBuf::from(&config.data_dir);
-    buf.push(SESSION_NAME);
-    buf
-}
-
-pub async fn create_client(config: &Cfg) -> Result<Client, InvocationError> {
-    let path_buf = get_session_path(config);
+async fn create_client(config: &Cfg) -> Result<Client, InvocationError> {
+    let mut path_buf = PathBuf::from(&config.data_dir);
+    path_buf.push(SESSION_NAME);
     let cfg = Config {
-        session: Session::load_file_or_create(path_buf.as_path()).expect("Cannot initialize session"),
+        session: Session::load_file_or_create(path_buf.as_path())
+            .expect("Cannot initialize session"),
         api_id: config.telegram.api_id,
         api_hash: config.telegram.api_hash.clone(),
         params: InitParams {
@@ -41,7 +39,7 @@ pub async fn create_client(config: &Cfg) -> Result<Client, InvocationError> {
                 &mut client,
                 config.telegram.api_id,
                 config.telegram.api_hash.clone(),
-                path_buf
+                path_buf,
             )
             .await
         }
@@ -55,7 +53,7 @@ pub async fn create_client(config: &Cfg) -> Result<Client, InvocationError> {
 }
 
 //Handles Telegram session establishment
-pub async fn handle(cli: &mut Client, api_id: i32, api_hash: String, path_buf: PathBuf) {
+async fn handle(cli: &mut Client, api_id: i32, api_hash: String, path_buf: PathBuf) {
     let phone: String = read_input("Telephone number".to_string(), &mut stdin().lock());
 
     match cli

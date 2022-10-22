@@ -1,22 +1,22 @@
 use std::path::PathBuf;
 
+use crate::telegram::types::TelegramClient;
 use crate::types::{Attachment, Cfg};
-use grammers_client::Client;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::task::JoinHandle;
 
 use crate::types::Post;
 use crate::types::{Processor, Runnable};
 
-pub struct TelegramDownloader {
-    client: Client,
+pub struct TelegramDownloader<T: TelegramClient> {
+    client: T,
     receiver: Option<Receiver<Post>>,
     sender: Option<Sender<Post>>,
     path: String,
 }
 
-impl TelegramDownloader {
-    pub(crate) fn new(client: Client, cfg: &Cfg) -> Self {
+impl<T: TelegramClient> TelegramDownloader<T> {
+    pub(crate) fn new(client: T, cfg: &Cfg) -> Self {
         TelegramDownloader {
             client,
             receiver: None,
@@ -42,7 +42,7 @@ impl TelegramDownloader {
     }
 }
 
-impl Processor<Post, Post> for TelegramDownloader {
+impl<T: TelegramClient> Processor<Post, Post> for TelegramDownloader<T> {
     fn set_input(&mut self, input: Receiver<Post>) {
         self.receiver = Some(input);
     }
@@ -51,7 +51,7 @@ impl Processor<Post, Post> for TelegramDownloader {
     }
 }
 
-impl Runnable for TelegramDownloader {
+impl<T: TelegramClient> Runnable for TelegramDownloader<T> {
     fn run(mut self) -> JoinHandle<()> {
         tokio::spawn(async move {
             loop {

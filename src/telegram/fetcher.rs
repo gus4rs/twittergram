@@ -1,23 +1,22 @@
+use crate::telegram::types::{TelegramClient, TelegramMessage, TelegramMessageIter};
 use crate::types::{Attachment, Post, Runnable, Source};
 use crate::Cfg;
-use grammers_client::types::Message;
-use grammers_client::Client;
 use std::collections::vec_deque::{Iter, VecDeque};
 use tokio::sync::mpsc::Sender;
 use tokio::task::JoinHandle;
 
 const IGNORE: &str = "#tgonly";
 
-pub struct TelegramGenerator {
-    client: Client,
+pub struct TelegramGenerator<T: TelegramClient> {
+    client: T,
     chat_name: String,
     last_id: i32,
     size: i32,
     sender: Option<Sender<Post>>,
 }
 
-impl TelegramGenerator {
-    pub(crate) fn new(client: Client, config: &Cfg, last_id: i32) -> Self {
+impl<T: TelegramClient> TelegramGenerator<T> {
+    pub(crate) fn new(client: T, config: &Cfg, last_id: i32) -> Self {
         TelegramGenerator {
             client,
             chat_name: config.telegram.chat_name.clone(),
@@ -28,7 +27,7 @@ impl TelegramGenerator {
     }
 }
 
-impl Source<Post> for TelegramGenerator {
+impl<T: TelegramClient> Source<Post> for TelegramGenerator<T> {
     fn set_output(&mut self, output: Sender<Post>) {
         self.sender = Some(output);
     }
@@ -58,12 +57,12 @@ impl<T> FixedDeque<T> {
     }
 }
 
-struct Album {
-    items: Vec<Message>,
+struct Album<M: TelegramMessage> {
+    items: Vec<M>,
     id: Option<i64>,
 }
 
-impl Album {
+impl<M: TelegramMessage> Album<M> {
     fn new() -> Self {
         Album {
             items: vec![],
@@ -100,7 +99,7 @@ impl Album {
         self.items.last().unwrap().id()
     }
 
-    fn add_item(&mut self, m: Message) {
+    fn add_item(&mut self, m: M) {
         self.items.push(m);
     }
     fn is_empty(&self) -> bool {
@@ -108,8 +107,8 @@ impl Album {
     }
 }
 
-impl Runnable for TelegramGenerator {
-    fn run(mut self) -> JoinHandle<()> {
+impl<T: TelegramClient> Runnable for TelegramGenerator<T> {
+    fn run(self) -> JoinHandle<()> {
         tokio::spawn(async move {
             let chat = match self.client.resolve_username(&*self.chat_name).await {
                 Ok(Some(c)) => c,
@@ -118,7 +117,7 @@ impl Runnable for TelegramGenerator {
                 }
             };
             let mut messages = self.client.iter_messages(&chat);
-            let mut album: Album = Album::new();
+            let mut album: Album<_> = Album::new();
             let mut temp_messages = FixedDeque::new(self.size);
             while let Ok(Some(msg)) = messages.next().await {
                 if msg.id() <= self.last_id

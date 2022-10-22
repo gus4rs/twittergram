@@ -1,25 +1,25 @@
+use crate::twitter::types::TwitterClient;
 use crate::types::{Post, Processor, Runnable};
-use egg_mode::media::{get_status, upload_media, ProgressInfo};
-use egg_mode::Token;
+use crate::Cfg;
+use egg_mode::media::ProgressInfo;
 use std::path::PathBuf;
 use std::time::Duration;
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::task::JoinHandle;
-use crate::Cfg;
 
-pub struct TwitterUploader {
-    token: Token,
+pub struct TwitterUploader<C> {
+    client: C,
     data_dir: String,
     receiver: Option<Receiver<Post>>,
     sender: Option<Sender<Post>>,
 }
 
-impl TwitterUploader {
-    pub fn new(token: Token, cfg: &Cfg) -> Self {
+impl<C: TwitterClient> TwitterUploader<C> {
+    pub fn new(client: C, cfg: &Cfg) -> Self {
         TwitterUploader {
-            token,
+            client,
             data_dir: cfg.data_dir.clone(),
             receiver: None,
             sender: None,
@@ -27,7 +27,7 @@ impl TwitterUploader {
     }
 }
 
-impl Processor<Post, Post> for TwitterUploader {
+impl<C: TwitterClient> Processor<Post, Post> for TwitterUploader<C> {
     fn set_input(&mut self, input: Receiver<Post>) {
         self.receiver = Some(input);
     }
@@ -36,7 +36,7 @@ impl Processor<Post, Post> for TwitterUploader {
     }
 }
 
-impl Runnable for TwitterUploader {
+impl<C: TwitterClient> Runnable for TwitterUploader<C> {
     fn run(mut self) -> JoinHandle<()> {
         tokio::spawn(async move {
             loop {
@@ -52,16 +52,16 @@ impl Runnable for TwitterUploader {
 
                             let mut buf = PathBuf::from(&self.data_dir);
                             buf.push(attachment.path());
-                            let mut file = File::open(buf.as_path())
-                                .await.expect("File missing");
+                            let mut file = File::open(buf.as_path()).await.expect("File missing");
                             file.read_to_end(&mut contents)
                                 .await
                                 .expect("Error reading file");
 
-                            let handle =
-                                upload_media(contents.as_slice(), attachment.mime(), &self.token)
-                                    .await
-                                    .expect("Error uploading media");
+                            let handle = self
+                                .client
+                                .upload_media(contents.as_slice(), attachment.mime())
+                                .await
+                                .expect("Error uploading media");
                             let mut progress = handle.progress;
 
                             loop {
@@ -95,7 +95,9 @@ impl Runnable for TwitterUploader {
                                         );
                                     }
                                 }
-                                progress = get_status(handle.id.clone(), &self.token)
+                                progress = self
+                                    .client
+                                    .get_status(handle.id.clone())
                                     .await
                                     .expect("Error progress")
                                     .progress;

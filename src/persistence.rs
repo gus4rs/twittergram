@@ -56,7 +56,7 @@ impl Persister {
         self.state.tg_id
     }
 
-    async fn check_data_dir(name: &str) {
+    pub async fn check_data_dir(name: &str) {
         match fs::metadata(name).await {
             Ok(m) => {
                 if m.is_dir() {
