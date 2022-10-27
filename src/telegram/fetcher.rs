@@ -119,58 +119,67 @@ impl<T: TelegramClient> Runnable for TelegramGenerator<T> {
             let mut messages = self.client.iter_messages(&chat);
             let mut album: Album<_> = Album::new();
             let mut temp_messages = FixedDeque::new(self.size);
-            while let Ok(Some(msg)) = messages.next().await {
-                if msg.id() <= self.last_id
-                    && (album.is_empty() || album.get_msg_id() <= self.last_id)
-                {
-                    break;
+
+            loop {
+                match messages.next().await {
+                    Ok(Some(msg)) => {
+                        if msg.id() <= self.last_id
+                            && (album.is_empty() || album.get_msg_id() <= self.last_id)
+                        {
+                            break;
+                        }
+
+                        match msg.grouped_id() {
+                            None if album.is_empty() => {
+                                // No opened album, simply post the message
+                                let post = Post::from_message(&msg);
+
+                                if post.validate(IGNORE) && msg.id() > self.last_id {
+                                    temp_messages.push(post);
+                                }
+                            }
+                            None => {
+                                // Assumes album is finished, close it and post ir
+                                // TODO: support interleaving of different albums and single messages
+                                let album_post = album.close();
+                                if album_post.validate(IGNORE) {
+                                    temp_messages.push(album_post);
+                                }
+
+                                // Post current message
+                                let post = Post::from_message(&msg);
+
+                                if post.validate(IGNORE) && msg.id() > self.last_id {
+                                    temp_messages.push(post);
+                                }
+                            }
+                            Some(_) if album.is_empty() => {
+                                // Message is part of an album, start tracking it
+                                album.start(msg.grouped_id());
+                                // Todo move to start
+                                album.add_item(msg);
+                            }
+                            Some(g) if g == album.get_group() => {
+                                // Message is part of a already tracked album
+                                album.add_item(msg);
+                            }
+                            Some(_) => {
+                                // Message is part of a different album; close current and start new
+                                let album_post = album.close();
+                                if album_post.validate(IGNORE) {
+                                    temp_messages.push(album_post);
+                                }
+
+                                album.start(msg.grouped_id());
+                                album.add_item(msg);
+                            }
+                        };
+                    }
+                    Ok(None) => break,
+                    Err(e) => {
+                        panic!("{}", e)
+                    }
                 }
-
-                match msg.grouped_id() {
-                    None if album.is_empty() => {
-                        // No opened album, simply post the message
-                        let post = Post::from_message(&msg);
-
-                        if post.validate(IGNORE) && msg.id() > self.last_id {
-                            temp_messages.push(post);
-                        }
-                    }
-                    None => {
-                        // Assumes album is finished, close it and post ir
-                        // TODO: support interleaving of different albums and single messages
-                        let album_post = album.close();
-                        if album_post.validate(IGNORE) {
-                            temp_messages.push(album_post);
-                        }
-
-                        // Post current message
-                        let post = Post::from_message(&msg);
-
-                        if post.validate(IGNORE) && msg.id() > self.last_id {
-                            temp_messages.push(post);
-                        }
-                    }
-                    Some(_) if album.is_empty() => {
-                        // Message is part of an album, start tracking it
-                        album.start(msg.grouped_id());
-                        // Todo move to start
-                        album.add_item(msg);
-                    }
-                    Some(g) if g == album.get_group() => {
-                        // Message is part of a already tracked album
-                        album.add_item(msg);
-                    }
-                    Some(_) => {
-                        // Message is part of a different album; close current and start new
-                        let album_post = album.close();
-                        if album_post.validate(IGNORE) {
-                            temp_messages.push(album_post);
-                        }
-
-                        album.start(msg.grouped_id());
-                        album.add_item(msg);
-                    }
-                };
             }
 
             for message in temp_messages.iterator() {

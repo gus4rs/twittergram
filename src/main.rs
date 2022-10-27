@@ -1,3 +1,5 @@
+extern crate core;
+
 use mime_guess::mime;
 use simple_logger::SimpleLogger;
 use tokio::fs;
