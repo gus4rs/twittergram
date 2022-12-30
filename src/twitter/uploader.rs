@@ -77,6 +77,17 @@ impl<C: TwitterClient> Runnable for TwitterUploader<C> {
                                     Some(ProgressInfo::Pending(secs))
                                     | Some(ProgressInfo::InProgress(secs)) => {
                                         tokio::time::sleep(Duration::from_secs(secs)).await;
+                                        match self.client.get_status(handle.id.clone()).await {
+                                            Ok(p) => progress = p.progress,
+                                            Err(err) => {
+                                                log::info!(
+                                                    "Media format not supported {} : {:?}",
+                                                    msg.id(),
+                                                    err
+                                                );
+                                                break;
+                                            }
+                                        }
                                     }
                                     Some(ProgressInfo::Failed(err)) if err.code == 3 => {
                                         attach_failed = true;
@@ -95,12 +106,6 @@ impl<C: TwitterClient> Runnable for TwitterUploader<C> {
                                         );
                                     }
                                 }
-                                progress = self
-                                    .client
-                                    .get_status(handle.id.clone())
-                                    .await
-                                    .expect("Error progress")
-                                    .progress;
                             }
                         }
                         if !attach_failed {
