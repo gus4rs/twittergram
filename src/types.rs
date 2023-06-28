@@ -1,6 +1,5 @@
 use crate::telegram::types::TelegramMessage;
 use crate::{mime, APPLICATION_OCTET_STREAM, TEXT_VCARD};
-use egg_mode::media::MediaId;
 use grammers_client::types::Media;
 use grammers_client::types::Media::{Contact, Document, Photo, Sticker};
 use mime_guess::Mime;
@@ -37,7 +36,7 @@ pub struct Post {
     id: i32,
     text: String,
     tg_attachments: Vec<Attachment>,
-    tw_attachments: Vec<MediaId>,
+    tw_attachments: Vec<u64>,
 }
 
 impl Post {
@@ -70,7 +69,7 @@ impl Post {
         &self.tg_attachments
     }
 
-    pub fn tw_attachments(&self) -> &Vec<MediaId> {
+    pub fn tw_attachments(&self) -> &Vec<u64> {
         &self.tw_attachments
     }
 
@@ -85,7 +84,7 @@ impl Post {
         }
     }
 
-    pub fn add_twitter_attachment(&mut self, attachment: MediaId) {
+    pub fn add_twitter_attachment(&mut self, attachment: u64) {
         self.tw_attachments.push(attachment);
     }
 

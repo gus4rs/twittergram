@@ -1,43 +1,40 @@
-use crate::mime::Mime;
 use async_trait::async_trait;
-use egg_mode::error::Error;
-use egg_mode::media::{MediaHandle, MediaId};
-use egg_mode::tweet::{DraftTweet, Tweet};
-use egg_mode::{error, Response};
-use std::borrow::Cow;
+use std::error::Error;
+use std::path::Path;
 
 #[derive(Debug, Clone)]
 pub struct TwitterBuilder {
-    pub tweet: DraftTweet,
+    media_ids: Vec<u64>,
+    text: String,
 }
 
 impl TwitterBuilder {
     pub(crate) fn new() -> Self {
         TwitterBuilder {
-            tweet: DraftTweet::new(String::new()),
+            media_ids: vec![],
+            text: "".to_string(),
         }
     }
-    pub fn add_media(&mut self, media_id: MediaId) {
-        let _ = &self.tweet.add_media(media_id);
+    pub fn add_media(&mut self, media_id: u64) {
+        let _ = &self.media_ids.push(media_id);
     }
 
     pub fn set_text(&mut self, text: String) {
-        self.tweet.text = Cow::from(text);
+        self.text = text;
     }
 
-    pub fn media_ids(&self) -> &Vec<MediaId> {
-        &self.tweet.media_ids
+    pub fn media_ids(&self) -> &Vec<u64> {
+        &self.media_ids
     }
     pub fn text(&self) -> String {
-        self.tweet.text.to_string()
+        self.text.clone()
     }
 }
 
 #[async_trait]
 pub trait Postable: Sync + Send + 'static {
-    async fn upload_media(&mut self, data: &[u8], media_type: &Mime) -> error::Result<MediaHandle>;
-    async fn send(&mut self) -> Result<Response<Tweet>, Error>;
-    async fn get_status(&self, media_id: MediaId) -> error::Result<MediaHandle>;
+    async fn upload_media(&mut self, file: &Path) -> Result<u64, Box<dyn Error>>;
+    async fn send(&mut self) -> Result<String, Box<dyn Error + Send + Sync>>;
 }
 
 pub trait TwitterClient: Postable {

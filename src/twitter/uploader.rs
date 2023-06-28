@@ -1,11 +1,8 @@
 use crate::twitter::types::TwitterClient;
 use crate::types::{Post, Processor, Runnable};
 use crate::Cfg;
-use egg_mode::media::ProgressInfo;
+use log::warn;
 use std::path::PathBuf;
-use std::time::Duration;
-use tokio::fs::File;
-use tokio::io::AsyncReadExt;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::task::JoinHandle;
 
@@ -48,63 +45,26 @@ impl<C: TwitterClient> Runnable for TwitterUploader<C> {
                         let mut attach_failed = false;
                         let mut media_ids = vec![];
                         for attachment in msg.attachments() {
-                            let mut contents = vec![];
-
                             let mut buf = PathBuf::from(&self.data_dir);
                             buf.push(attachment.path());
-                            let mut file = File::open(buf.as_path()).await.expect("File missing");
-                            file.read_to_end(&mut contents)
-                                .await
-                                .expect("Error reading file");
 
-                            let handle = self
-                                .client
-                                .upload_media(contents.as_slice(), attachment.mime())
-                                .await
-                                .expect("Error uploading media");
-                            let mut progress = handle.progress;
+                            let result = self.client.upload_media(buf.as_path()).await;
 
-                            loop {
-                                match progress {
-                                    None | Some(ProgressInfo::Success) => {
-                                        log::info!(
-                                            "Media {} successfully processed",
-                                            attachment.path()
-                                        );
-                                        media_ids.push(handle.id);
-                                        break;
-                                    }
-                                    Some(ProgressInfo::Pending(secs))
-                                    | Some(ProgressInfo::InProgress(secs)) => {
-                                        tokio::time::sleep(Duration::from_secs(secs)).await;
-                                        match self.client.get_status(handle.id.clone()).await {
-                                            Ok(p) => progress = p.progress,
-                                            Err(err) => {
-                                                log::info!(
-                                                    "Media format not supported {} : {:?}",
-                                                    msg.id(),
-                                                    err
-                                                );
-                                                break;
-                                            }
-                                        }
-                                    }
-                                    Some(ProgressInfo::Failed(err)) if err.code == 3 => {
-                                        attach_failed = true;
-                                        log::info!(
-                                            "Media format not supported {} : {:?}",
-                                            msg.id(),
-                                            err
-                                        );
-                                        break;
-                                    }
-                                    Some(ProgressInfo::Failed(err)) => {
-                                        panic!(
-                                            "[Uploader] Error uploading media {} : {:?}",
-                                            msg.id(),
-                                            err
-                                        );
-                                    }
+                            match result {
+                                Ok(id) => {
+                                    log::info!(
+                                        "Media {} successfully processed",
+                                        attachment.path()
+                                    );
+                                    media_ids.push(id);
+                                }
+                                Err(err) => {
+                                    attach_failed = true;
+                                    warn!(
+                                        "[Uploader] Error uploading media {} : {:?}",
+                                        msg.id(),
+                                        err
+                                    );
                                 }
                             }
                         }

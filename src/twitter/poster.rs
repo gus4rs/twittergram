@@ -1,6 +1,5 @@
 use crate::twitter::types::TwitterClient;
 use crate::types::{Post, Processor, Runnable};
-use egg_mode::error::Error;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::task::JoinHandle;
 
@@ -55,20 +54,14 @@ impl<C: TwitterClient> Runnable for TwitterPoster<C> {
                                     self.sender.as_ref().unwrap().send(msg).await.expect("TODO");
                                     log::info!("Successfully posted tweet for {}", id);
                                 }
-                                Err(Error::TwitterError(_, twitter_errors))
-                                    if twitter_errors.errors.len() == 1 =>
-                                {
-                                    if let Some(code) = twitter_errors.errors.first() {
-                                        if code.code == 324 {
-                                            log::warn!("Error sending tweet {}, the media is unsupported. This will not be retried: {:?}", msg.id(), code);
-                                        }
-                                        self.sender
-                                            .as_ref()
-                                            .unwrap()
-                                            .send(msg)
-                                            .await
-                                            .expect("send");
-                                    }
+                                Err(e) if e.to_string().contains("Your media IDs are invalid") => {
+                                    log::warn!("Error sending tweet {}, the media is unsupported. This will not be retried.", msg.id());
+                                    self.sender
+                                        .as_ref()
+                                        .unwrap()
+                                        .send(msg)
+                                        .await
+                                        .expect("send");
                                 }
                                 Err(e) => {
                                     panic!("[Poster] Error sending Tweet for {}:{:?}", msg.id(), e);

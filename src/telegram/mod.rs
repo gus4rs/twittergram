@@ -43,7 +43,7 @@ async fn create_client(config: &Cfg) -> Result<Client, InvocationError> {
             )
             .await
         }
-        Ok(true) => log::info!("Telegram client crerated"),
+        Ok(true) => log::info!("Telegram client created"),
         Err(e) => {
             panic!("{:?}", e);
         }
