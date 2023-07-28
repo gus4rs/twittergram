@@ -3,6 +3,7 @@ use crate::types::{Post, Processor, Runnable};
 use crate::Cfg;
 use log::warn;
 use std::path::PathBuf;
+use critter::error::Error;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::task::JoinHandle;
 
@@ -47,8 +48,8 @@ impl<C: TwitterClient> Runnable for TwitterUploader<C> {
                         for attachment in msg.attachments() {
                             let mut buf = PathBuf::from(&self.data_dir);
                             buf.push(attachment.path());
-
-                            let result = self.client.upload_media(buf.as_path()).await;
+                            let media_type = attachment.mime();
+                            let result = self.client.upload_media(buf.as_path(), media_type).await;
 
                             match result {
                                 Ok(id) => {
@@ -59,12 +60,16 @@ impl<C: TwitterClient> Runnable for TwitterUploader<C> {
                                     media_ids.push(id);
                                 }
                                 Err(err) => {
-                                    attach_failed = true;
                                     warn!(
                                         "[Uploader] Error uploading media {} : {:?}",
                                         msg.id(),
                                         err
                                     );
+                                    if let Some(bad_media) = err.downcast_ref::<Error>() {
+                                        println!("The media is not supported by Twitter, this will no be retried {}", bad_media);
+                                    } else {
+                                        attach_failed = true;
+                                    }
                                 }
                             }
                         }

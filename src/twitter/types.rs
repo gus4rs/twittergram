@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use std::error::Error;
 use std::path::Path;
+use mime_guess::Mime;
 
 #[derive(Debug, Clone)]
 pub struct TwitterBuilder {
@@ -33,7 +34,7 @@ impl TwitterBuilder {
 
 #[async_trait]
 pub trait Postable: Sync + Send + 'static {
-    async fn upload_media(&mut self, file: &Path) -> Result<u64, Box<dyn Error>>;
+    async fn upload_media(&mut self, file: &Path, media_type: &Mime) -> Result<u64, Box<dyn Error>>;
     async fn send(&mut self) -> Result<String, Box<dyn Error + Send + Sync>>;
 }
 

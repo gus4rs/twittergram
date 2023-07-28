@@ -5,6 +5,7 @@ use critter::auth::TwitterAuth;
 use critter::TwitterClient as Critter;
 use std::error::Error;
 use std::path::Path;
+use mime_guess::Mime;
 
 #[derive(Clone)]
 pub struct CritterClient {
@@ -33,12 +34,12 @@ impl CritterClient {
 
 #[async_trait]
 impl Postable for CritterClient {
-    async fn upload_media(&mut self, file: &Path) -> Result<u64, Box<dyn Error>> {
+    async fn upload_media(&mut self, file: &Path, media_type: &Mime) -> Result<u64, Box<dyn Error>> {
         let filename = file
             .file_name()
             .map(|o| o.to_os_string().into_string().unwrap());
         let path = file.to_str().expect("Error getting file path");
-        match self.client.upload_media(path, filename).await {
+        match self.client.upload_media(path, filename, Some(media_type.to_string())).await {
             Ok(mut res) => Ok(res.id().parse().unwrap()),
             Err(err) => Err(Box::try_from(err).unwrap()),
         }
